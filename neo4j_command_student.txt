@@ -1,0 +1,57 @@
+// Index creation
+CREATE CONSTRAINT drug_index IF NOT EXISTS FOR (c:Drug) REQUIRE c.cui IS UNIQUE
+;
+CREATE CONSTRAINT moa_index IF NOT EXISTS FOR (m:MOA) REQUIRE m.id IS UNIQUE
+;
+CREATE CONSTRAINT disorder_index IF NOT EXISTS FOR (d:Disorder) REQUIRE d.cui IS UNIQUE
+;
+CREATE CONSTRAINT atc_index IF NOT EXISTS FOR (a:ATC) REQUIRE a.atc IS UNIQUE
+;
+
+
+//Load the moa
+LOAD CSV WITH HEADERS FROM 'file:///moa.tsv' AS row FIELDTERMINATOR '\t'  MERGE (m:MOA {name: row.name, id: row.id}) 
+;
+
+//Load the drug
+CALL apoc.load.jsonArray('file:///drugs.json') YIELD value MERGE  (d:Drug {cui: value.cui, name: value.name, level: value.level, tradename: coalesce(value.tradename, []), atc: value.atc}) 
+;
+
+//Load the drug_moa relation
+LOAD CSV WITH HEADERS FROM 'file:///drug_moa.tsv' AS row FIELDTERMINATOR '\t'  MERGE (d:Drug {cui: row.from}) MERGE (m:MOA {id: row.to}) MERGE (d)-[r:HAS_MOA]->(m)
+;
+
+
+
+
+// vector definitionEmbedding
+CREATE VECTOR INDEX disorder_embeddings_index
+FOR (n:Disorder) ON (n.definitionEmbedding)
+OPTIONS {indexConfig: {
+ `vector.dimensions`: 1536,
+ `vector.similarity_function`: 'cosine'
+}};
+
+
+// In case something wrong, run the following to clean up
+DROP CONSTRAINT drug_index
+;
+DROP CONSTRAINT moa_index
+;
+DROP CONSTRAINT disorder_index
+;
+DROP CONSTRAINT atc_index
+;
+DROP INDEX disorder_embeddings_index
+;
+MATCH (n)
+DETACH DELETE n;
+
+
+
+
+
+MATCH (d:Disorder {name: 'Diabetes Mellitus, Non-Insulin-Dependent'})
+CALL db.index.vector.queryNodes('disorder_embeddings_index', 5, d.definitionEmbedding)
+YIELD node AS simmilarDisorder, score
+RETURN simmilarDisorder.name AS name, score
