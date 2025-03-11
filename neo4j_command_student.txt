@@ -1,4 +1,4 @@
-// Index creation
+
 CREATE CONSTRAINT drug_index IF NOT EXISTS FOR (c:Drug) REQUIRE c.cui IS UNIQUE
 ;
 CREATE CONSTRAINT moa_index IF NOT EXISTS FOR (m:MOA) REQUIRE m.id IS UNIQUE
@@ -9,19 +9,28 @@ CREATE CONSTRAINT atc_index IF NOT EXISTS FOR (a:ATC) REQUIRE a.atc IS UNIQUE
 ;
 
 
-//Load the moa
 LOAD CSV WITH HEADERS FROM 'file:///moa.tsv' AS row FIELDTERMINATOR '\t'  MERGE (m:MOA {name: row.name, id: row.id}) 
 ;
-
-//Load the drug
 CALL apoc.load.jsonArray('file:///drugs.json') YIELD value MERGE  (d:Drug {cui: value.cui, name: value.name, level: value.level, tradename: coalesce(value.tradename, []), atc: value.atc}) 
 ;
 
-//Load the drug_moa relation
+
 LOAD CSV WITH HEADERS FROM 'file:///drug_moa.tsv' AS row FIELDTERMINATOR '\t'  MERGE (d:Drug {cui: row.from}) MERGE (m:MOA {id: row.to}) MERGE (d)-[r:HAS_MOA]->(m)
 ;
 
 
+
+//demo part
+CALL apoc.load.jsonArray('file:///atc.json') YIELD value MERGE  (a:ATC {cui: value.cui, name: value.name, level: value.level, atc: value.atc}) 
+;
+CALL apoc.load.jsonArray('file:///disorders.json') YIELD value MERGE  (d:Disorder {cui: value.cui, name: value.name, definition: value.definition, definitionEmbedding: value.definitionEmbedding}) 
+;
+LOAD CSV WITH HEADERS FROM 'file:///atc_atc.tsv' AS row FIELDTERMINATOR '\t'  MERGE (a1:ATC {atc: row.from}) MERGE (a2:ATC {atc: row.to}) MERGE (a1)-[r:BELONGS_TO]->(a2)
+;
+LOAD CSV WITH HEADERS FROM 'file:///drug_atc.tsv' AS row FIELDTERMINATOR '\t'  MERGE (d:Drug {cui: row.from}) MERGE (a:ATC {atc: row.to}) MERGE (d)-[r:BELONGS_TO]->(a)
+;
+LOAD CSV WITH HEADERS FROM 'file:///drug_disorder.tsv' AS row FIELDTERMINATOR '\t'  MERGE (d:Drug {cui: row.from}) MERGE (d2:Disorder {cui: row.to}) MERGE (d)-[r:MAY_TREAT]->(d2)
+;
 
 
 // vector definitionEmbedding
@@ -32,8 +41,8 @@ OPTIONS {indexConfig: {
  `vector.similarity_function`: 'cosine'
 }};
 
-
 // In case something wrong, run the following to clean up
+
 DROP CONSTRAINT drug_index
 ;
 DROP CONSTRAINT moa_index
@@ -44,6 +53,7 @@ DROP CONSTRAINT atc_index
 ;
 DROP INDEX disorder_embeddings_index
 ;
+
 MATCH (n)
 DETACH DELETE n;
 
