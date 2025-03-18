@@ -65,3 +65,64 @@ MATCH (d:Disorder {name: 'Diabetes Mellitus, Non-Insulin-Dependent'})
 CALL db.index.vector.queryNodes('disorder_embeddings_index', 5, d.definitionEmbedding)
 YIELD node AS simmilarDisorder, score
 RETURN simmilarDisorder.name AS name, score
+
+
+
+
+
+
+
+MATCH (a:Drug) RETURN a;
+MATCH (a:Drug) RETURN a LIMIT 5;
+
+
+MATCH p=(d:Drug) -->(m:Disorder) RETURN p LIMIT 5;
+MATCH p=(a:Drug) -->(m:Disorder) <--(c:Drug) RETURN p LIMIT 5;
+
+
+
+MATCH (a:Drug) -->(m:Disorder) RETURN a.name LIMIT 5;
+
+
+MATCH (d:Drug) WHERE d.name = "peramivir" RETURN d
+
+MATCH (d:Drug {name: "peramivir"}) RETURN d
+
+
+
+MATCH (d:Drug) WHERE  "Glynase" in d.tradename RETURN d
+
+
+
+MATCH (d:Drug) --> (m:Disorder {name: "Influenza"}) RETURN AVG(d.level)
+
+
+
+MATCH (d:Drug) --> (m:Disorder) 
+RETURN m.name, sum(d.level) LIMIT 5;
+
+MATCH (d:Drug) --> (m:Disorder) 
+RETURN m.name, sum(d.level) AS total_level 
+ORDER BY total_level DESC LIMIT 5;
+
+MATCH (d:Drug) 
+RETURN d.name, SIZE(d.tradename) / d.level AS tradename_level 
+ORDER BY tradename_level DESC LIMIT 10;
+
+MATCH (d:Drug) --> (m:Disorder {name: "Influenza"})
+WITH SUM(SIZE(d.tradename)) AS tradename_count_total
+
+MATCH (d:Drug) --> (m:Disorder {name: "Influenza"})
+RETURN d.name, 100*SIZE(d.tradename)/tradename_count_total
+
+
+
+:params my_disorder => 'Influenza'
+MATCH (d:Drug) --> (m:Disorder {name: $my_disorder})
+WITH SUM(SIZE(d.tradename)) AS tradename_count_total
+
+MATCH (d:Drug) --> (m:Disorder {name: $my_disorder})
+RETURN d.name, 100*SIZE(d.tradename)/tradename_count_total
+
+MATCH (n)
+DETACH DELETE n;
